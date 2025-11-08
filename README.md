@@ -1,5 +1,6 @@
 # Mentorship Graph
-This project explores bachelor thesis abstracts and analyzes the relationships between students, their mentors, and commission members. It examines patterns in thesis supervision and committee composition to understand how these academic relationships form and evolve. The system provides a predictive model that recommends the most suitable mentor for a given bachelor thesis abstract based on historical data and relationship patterns.
+This project explores bachelor thesis abstracts and analyzes the relationships between students, their mentors, and commission members.
+The system provides a predictive model that recommends the most suitable mentor for a given bachelor thesis abstract based on historical data and relationship patterns.
 
 ## Development
 ### Requirements
