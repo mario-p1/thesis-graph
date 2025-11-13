@@ -130,7 +130,7 @@ def main():
 
             loss.backward()
             optimizer.step()
-            total_loss += float(loss) * pred.numel()
+            total_loss += loss.item() * pred.numel()
             total_examples += pred.numel()
         print(f"Epoch {epoch:03d}, Loss: {total_loss / total_examples:.4f}")
 
