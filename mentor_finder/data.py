@@ -39,7 +39,10 @@ def build_graph(df: pd.DataFrame) -> tuple[HeteroData, dict[str, Any]]:
     supervises_mentor = df["mentor"].apply(lambda mentor: mentors_dict[mentor])
     supervises_thesis = df.index.tolist()
     supervises_features = torch.vstack(
-        [torch.LongTensor(supervises_mentor), torch.LongTensor(supervises_thesis)]
+        [
+            torch.LongTensor(supervises_thesis),
+            torch.LongTensor(supervises_mentor),
+        ]
     )
 
     # Build graph
@@ -47,8 +50,9 @@ def build_graph(df: pd.DataFrame) -> tuple[HeteroData, dict[str, Any]]:
     graph["thesis"].node_id = torch.arange(len(df))
     graph["thesis"].x = thesis_features
     graph["mentor"].node_id = torch.arange(len(mentors))
-    graph["mentor", "supervises", "thesis"].edge_index = supervises_features
-    graph["thesis", "supervised_by", "mentor"].edge_index = supervises_features.flip(0)
+
+    graph["thesis", "supervised_by", "mentor"].edge_index = supervises_features
+    graph["mentor", "supervises", "thesis"].edge_index = supervises_features.flip(0)
 
     # Validate the constructed graph
     graph.validate()
