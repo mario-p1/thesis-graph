@@ -64,7 +64,7 @@ def main():
     pd.options.display.max_columns = 20
 
     df = load_raw_committee_csv(Path(__file__).parent.parent / "data" / "committee.csv")
-    # df = df.head(10)
+    # df = df.head(20)
 
     data, metadata = build_graph(df)
 
@@ -75,6 +75,9 @@ def main():
     transform = T.RandomLinkSplit(
         num_val=0.1,
         num_test=0.1,
+        disjoint_train_ratio=0.7,
+        neg_sampling_ratio=2,
+        add_negative_train_samples=True,
         edge_types=[("thesis", "supervised_by", "mentor")],
         rev_edge_types=[("mentor", "supervises", "thesis")],
     )
@@ -88,7 +91,6 @@ def main():
     train_loader = LinkNeighborLoader(
         data=train_data,
         num_neighbors=[20, 10],
-        neg_sampling_ratio=2.0,
         batch_size=64,
         edge_label_index=(
             ("thesis", "supervised_by", "mentor"),
