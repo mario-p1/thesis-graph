@@ -7,9 +7,56 @@ import torch_geometric.transforms as T
 import tqdm
 from torch_geometric.loader import LinkNeighborLoader
 
-
 from mentor_finder.data import build_graph, load_raw_committee_csv
 from mentor_finder.model import Model
+
+
+def train_epoch(
+    model: Model,
+    loader: LinkNeighborLoader,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+):
+    model.train()
+    total_loss = total_examples = 0
+    for sampled_data in tqdm.tqdm(loader):
+        optimizer.zero_grad()
+
+        sampled_data = sampled_data.to(device)
+
+        pred = model.forward(sampled_data)
+
+        loss = F.binary_cross_entropy_with_logits(
+            pred,
+            sampled_data["thesis", "supervised_by", "mentor"].edge_label.float(),
+        )
+
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item() * pred.numel()
+        total_examples += pred.numel()
+
+    return total_loss / total_examples
+
+
+def validate(model: Model, loader: LinkNeighborLoader, device: torch.device):
+    model.eval()
+    total_loss = total_examples = 0
+    with torch.no_grad():
+        for sampled_data in loader:
+            sampled_data = sampled_data.to(device)
+
+            pred = model.forward(sampled_data)
+
+            loss = F.binary_cross_entropy_with_logits(
+                pred,
+                sampled_data["thesis", "supervised_by", "mentor"].edge_label.float(),
+            )
+
+            total_loss += loss.item() * pred.numel()
+            total_examples += pred.numel()
+
+    return total_loss / total_examples
 
 
 def main():
@@ -63,6 +110,9 @@ def main():
         edge_label=val_data["thesis", "supervised_by", "mentor"].edge_label,
         shuffle=False,
     )
+
+    breakpoint()
+
     model = Model(hidden_channels=32, data=train_data)
     print("=> Model")
     print(model)
@@ -74,24 +124,11 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     for epoch in range(1, 20):
-        total_loss = total_examples = 0
-        for sampled_data in tqdm.tqdm(train_loader):
-            optimizer.zero_grad()
-
-            sampled_data = sampled_data.to(device)
-
-            pred = model.forward(sampled_data)
-
-            loss = F.binary_cross_entropy_with_logits(
-                pred,
-                sampled_data["thesis", "supervised_by", "mentor"].edge_label.float(),
-            )
-
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item() * pred.numel()
-            total_examples += pred.numel()
-        print(f"Epoch {epoch:03d}, Loss: {total_loss / total_examples:.4f}")
+        train_loss = train_epoch(model, train_loader, optimizer, device)
+        val_loss = validate(model, val_loader, device)
+        print(
+            f"Epoch {epoch:02d}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
+        )
 
 
 if __name__ == "__main__":
