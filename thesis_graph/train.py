@@ -1,20 +1,21 @@
 from pathlib import Path
 
+import mlflow
 import pandas as pd
-
-from sklearn.metrics import (
-    classification_report,
-    accuracy_score,
-    f1_score,
-    precision_score,
-    recall_score,
-)
 import torch
 import torch.nn.functional as F
 import torch_geometric.transforms as T
 import tqdm
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    f1_score,
+    precision_score,
+    recall_score,
+)
+from torch_geometric import seed_everything
 from torch_geometric.loader import LinkNeighborLoader
-import mlflow
+
 from thesis_graph.data import build_graph, load_raw_committee_csv
 from thesis_graph.model import Model
 
@@ -31,13 +32,12 @@ def train_epoch(
         optimizer.zero_grad()
 
         sampled_data = sampled_data.to(device)
+        y = sampled_data["thesis", "supervised_by", "mentor"].edge_label
 
         pred = model(sampled_data)
+        loss = F.binary_cross_entropy_with_logits(pred, y)
 
-        loss = F.binary_cross_entropy_with_logits(
-            pred,
-            sampled_data["thesis", "supervised_by", "mentor"].edge_label,
-        )
+        # breakpoint()
 
         loss.backward()
         optimizer.step()
@@ -81,9 +81,10 @@ def validate(
 def main():
     # Hyperparameters
     disjoint_train_ratio = 0.6
-    neg_sampling_ratio = 1.0
-    add_negative_train_samples = True
+    neg_sampling_train_ratio = 2.0
+    neg_sampling_val_test_ratio = 1.0
 
+    seed_everything(42)
     pd.options.display.max_rows = 20
     pd.options.display.max_columns = 20
 
@@ -97,15 +98,15 @@ def main():
     print(metadata)
 
     mlflow.log_param("disjoint_train_ratio", disjoint_train_ratio)
-    mlflow.log_param("neg_sampling_ratio", neg_sampling_ratio)
-    mlflow.log_param("add_negative_train_samples", add_negative_train_samples)
+    mlflow.log_param("neg_sampling_train_ratio", neg_sampling_train_ratio)
+    mlflow.log_param("neg_sampling_val_test_ratio", neg_sampling_val_test_ratio)
 
     transform = T.RandomLinkSplit(
         num_val=0.1,
         num_test=0.1,
         disjoint_train_ratio=disjoint_train_ratio,
-        neg_sampling_ratio=neg_sampling_ratio,
-        add_negative_train_samples=add_negative_train_samples,
+        neg_sampling_ratio=neg_sampling_val_test_ratio,
+        add_negative_train_samples=False,
         edge_types=[("thesis", "supervised_by", "mentor")],
         rev_edge_types=[("mentor", "supervises", "thesis")],
     )
@@ -126,6 +127,7 @@ def main():
         ),
         edge_label=train_data["thesis", "supervised_by", "mentor"].edge_label,
         shuffle=True,
+        neg_sampling_ratio=neg_sampling_train_ratio,
     )
 
     val_loader = LinkNeighborLoader(
