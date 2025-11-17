@@ -79,6 +79,11 @@ def validate(
 
 
 def main():
+    # Hyperparameters
+    disjoint_train_ratio = 0.5
+    neg_sampling_ratio = 1.0
+    add_negative_train_samples = True
+
     pd.options.display.max_rows = 20
     pd.options.display.max_columns = 20
 
@@ -90,10 +95,6 @@ def main():
     print("=> Data")
     print(data)
     print(metadata)
-
-    disjoint_train_ratio = 0.7
-    neg_sampling_ratio = 1.0
-    add_negative_train_samples = True
 
     mlflow.log_param("disjoint_train_ratio", disjoint_train_ratio)
     mlflow.log_param("neg_sampling_ratio", neg_sampling_ratio)
