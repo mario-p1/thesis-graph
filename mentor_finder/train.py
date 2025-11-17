@@ -91,12 +91,20 @@ def main():
     print(data)
     print(metadata)
 
+    disjoint_train_ratio = 0.7
+    neg_sampling_ratio = 1.0
+    add_negative_train_samples = True
+
+    mlflow.log_param("disjoint_train_ratio", disjoint_train_ratio)
+    mlflow.log_param("neg_sampling_ratio", neg_sampling_ratio)
+    mlflow.log_param("add_negative_train_samples", add_negative_train_samples)
+
     transform = T.RandomLinkSplit(
         num_val=0.1,
         num_test=0.1,
-        disjoint_train_ratio=0.7,
-        neg_sampling_ratio=1,
-        add_negative_train_samples=True,
+        disjoint_train_ratio=disjoint_train_ratio,
+        neg_sampling_ratio=neg_sampling_ratio,
+        add_negative_train_samples=add_negative_train_samples,
         edge_types=[("thesis", "supervised_by", "mentor")],
         rev_edge_types=[("mentor", "supervises", "thesis")],
     )
@@ -122,7 +130,6 @@ def main():
     val_loader = LinkNeighborLoader(
         data=val_data,
         num_neighbors=[20, 10],
-        neg_sampling_ratio=0.0,
         batch_size=64,
         edge_label_index=(
             ("thesis", "supervised_by", "mentor"),
@@ -142,11 +149,12 @@ def main():
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
-    for epoch in range(1, 15):
+    for epoch in range(1, 16):
         train_loss = train_epoch(model, train_loader, optimizer, device)
 
         val_loss, val_preds, val_labels = validate(model, val_loader, device)
 
+        # breakpoint()
         val_accuracy = accuracy_score(val_labels, val_preds)
         val_f1 = f1_score(val_labels, val_preds)
         precision = precision_score(val_labels, val_preds)
