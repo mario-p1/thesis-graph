@@ -19,7 +19,7 @@ def load_raw_committee_csv(path: Path) -> pd.DataFrame:
         "c2",
         "thesis_application_date",
         "thesis_status",
-        "graduation_thesis_desc_mk",
+        "thesis_desc_mk",
         "thesis_desc_en",
         "thesis_title_en",
     ]
