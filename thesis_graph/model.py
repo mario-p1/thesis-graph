@@ -1,22 +1,8 @@
 import torch
 from torch import Tensor
 from torch_geometric.data import HeteroData
-from torch_geometric.nn import SAGEConv, to_hetero
-import torch.nn.functional as F
+from torch_geometric.nn import to_hetero
 from torch_geometric.nn.models import GraphSAGE
-
-
-class GNN(torch.nn.Module):
-    def __init__(self, hidden_channels: int):
-        super().__init__()
-        self.conv1 = SAGEConv(hidden_channels, hidden_channels)
-        self.conv2 = SAGEConv(hidden_channels, hidden_channels)
-
-    def forward(self, x: Tensor, edge_index: Tensor) -> Tensor:
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = self.conv2(x, edge_index)
-        return x
 
 
 class Classifier(torch.nn.Module):
