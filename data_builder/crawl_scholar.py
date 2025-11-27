@@ -1,4 +1,5 @@
 import itertools
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -60,13 +61,13 @@ def convert_cyrillic_to_latin(text: str) -> list[list[str]]:
     return ["".join(p) for p in product]
 
 
-def search_for_researcher_profiles(
+def get_scholar_profiles(
     client: serpapi.Client,
-    name: str,
+    query: str,
 ) -> list[dict[str, Any]] | None:
     params = {
         "engine": "google_scholar",
-        "q": name,
+        "q": query,
     }
     result = client.search(params).as_dict()
 
@@ -74,6 +75,40 @@ def search_for_researcher_profiles(
         return result["profiles"].get("authors", [])
 
     return None
+
+
+def search_for_multiple_cyrillic_names(
+    client: serpapi.Client,
+    cyrillic_names: list[str],
+    query_suffix=", FINKI",
+    max_searches: int = 100,
+) -> list[dict[str, Any]]:
+    profiles = []
+    search_counter = max_searches
+
+    for name in cyrillic_names:
+        name_variants = convert_cyrillic_to_latin(name)
+
+        for name_variant in name_variants:
+            query = f"{name_variant}{query_suffix}"
+
+            profiles = get_scholar_profiles(client, query)
+            if profiles is not None and len(profiles) > 0:
+                for profile in profiles:
+                    profiles.append(
+                        {
+                            "original_name": name,
+                            "search_query": query,
+                            "result": profile,
+                        }
+                    )
+                break
+
+        search_counter -= 1
+        if search_counter == 0:
+            break
+
+    return profiles
 
 
 def main():
@@ -89,26 +124,17 @@ def main():
         .unique()
         .tolist()
     )
+    print("== Researchers ==")
     print(researchers)
 
-    result = {}
+    google_scholar_profiles = search_for_multiple_cyrillic_names(
+        client, researchers, max_searches=150
+    )
 
-    counter = 70
-
-    for researcher in researchers:
-        name_variants = convert_cyrillic_to_latin(researcher)
-
-        for name_variant in name_variants:
-            profiles = search_for_researcher_profiles(client, f"{name_variant}, FINKI")
-            if profiles is not None and len(profiles) > 0:
-                result[researcher] = profiles
-                break
-
-        counter -= 1
-        if counter == 0:
-            break
-
-    print(result)
+    with open(
+        base_data_path / "google_scholar_profiles.json", "w", encoding="utf-8"
+    ) as f:
+        json.dump(google_scholar_profiles, f, ensure_ascii=False, indent=4)
 
 
 if __name__ == "__main__":
