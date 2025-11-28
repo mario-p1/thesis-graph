@@ -39,9 +39,7 @@ def search_for_multiple_cyrillic_names(
     search_counter = max_searches
 
     save_path = (
-        base_data_path
-        / "scholar_crawls"
-        / f"profiles_result_{get_current_time_str()}.json"
+        base_data_path / "scholar_crawls" / f"profiles_{get_current_time_str()}.json"
     )
     save_path.parent.mkdir(parents=True, exist_ok=True)
 

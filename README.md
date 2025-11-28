@@ -18,8 +18,9 @@ make install_deps_cu128
 ```
 
 ### Data
-The data folder should contain the following files:
+The data folder must contain the following files:
 1. `committee.csv`
+2. `scholar_details.json`
 
 ### Train
 ```bash
