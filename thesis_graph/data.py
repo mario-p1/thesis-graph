@@ -43,8 +43,8 @@ def build_graph(
     mentors = sorted(thesis_df["mentor"].unique().tolist())
     mentors_dict = {mentor: index for index, mentor in enumerate(mentors)}
 
-    researchers_features = build_mentors_features_matrix(researchers_df, mentors_dict)
-    researchers_features = torch.from_numpy(researchers_features)
+    # researchers_features = build_mentors_features_matrix(researchers_df, mentors_dict)
+    # researchers_features = torch.from_numpy(researchers_features)
 
     # Build thesis features
     desc_embeddings = embed_text(thesis_df["thesis_desc_en"].tolist())
@@ -66,7 +66,7 @@ def build_graph(
     graph["thesis"].x = thesis_features
 
     graph["mentor"].node_id = torch.arange(len(mentors))
-    graph["mentor"].x = researchers_features
+    # graph["mentor"].x = researchers_features
 
     graph["thesis", "supervised_by", "mentor"].edge_index = supervises_features
     graph["mentor", "supervises", "thesis"].edge_index = supervises_features.flip(0)
