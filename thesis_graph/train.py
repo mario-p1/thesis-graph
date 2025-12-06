@@ -16,6 +16,7 @@ from torch_geometric import seed_everything
 from torch_geometric.loader import LinkNeighborLoader
 
 from thesis_graph.data import build_graph, load_researchers_csv, load_thesis_csv
+from thesis_graph.metrics import add_prefix_to_metrics, get_metrics
 from thesis_graph.model import Model
 from thesis_graph.utils import base_data_path
 
@@ -174,34 +175,22 @@ def main():
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    val_best_f1 = 0
-    val_best_accuracy = 0
-    val_best_precision = 0
-    val_best_recall = 0
     val_best_epoch = -1
-    val_best_sensitivity = 0
-    val_best_specificity = 0
+    val_best_metrics = {}
     val_best_report = ""
 
     for epoch in range(1, num_epochs + 1):
         train_loss = train_epoch(model, train_loader, optimizer, device)
 
         val_loss, val_preds, val_labels = validate(model, val_loader, device)
+        _, train_preds, train_labels = validate(model, train_loader, device)
 
-        val_f1 = f1_score(val_labels, val_preds, average="weighted")
-        val_accuracy = accuracy_score(val_labels, val_preds)
-        val_precision = precision_score(val_labels, val_preds)
-        val_recall = recall_score(val_labels, val_preds)
-        val_specificity = recall_score(val_labels, val_preds, pos_label=0)
+        val_metrics = get_metrics(val_labels, val_preds)
+        train_metrics = get_metrics(train_labels, train_preds)
 
-        if val_f1 > val_best_f1:
+        if val_metrics["f1"] > val_best_metrics.get("f1", 0):
             val_best_epoch = epoch
-            val_best_f1 = val_f1
-            val_best_accuracy = val_accuracy
-            val_best_precision = val_precision
-            val_best_recall = val_recall
-            val_best_sensitivity = val_recall
-            val_best_specificity = val_specificity
+            val_best_metrics = val_metrics
 
             val_best_report = classification_report(
                 val_labels,
@@ -210,25 +199,15 @@ def main():
 
         mlflow.log_metric("train_loss", train_loss, step=epoch)
         mlflow.log_metric("val_loss", val_loss, step=epoch)
-        mlflow.log_metric("val_f1", val_f1, step=epoch)
-        mlflow.log_metric("val_accuracy", val_accuracy, step=epoch)
-        mlflow.log_metric("val_precision", val_precision, step=epoch)
-        mlflow.log_metric("val_recall", val_recall, step=epoch)
-        mlflow.log_metric("val_sensitivity", val_recall, step=epoch)
-        mlflow.log_metric("val_specificity", val_specificity, step=epoch)
+
+        mlflow.log_metrics(add_prefix_to_metrics(val_metrics, "val"), step=epoch)
+        mlflow.log_metrics(add_prefix_to_metrics(train_metrics, "train"), step=epoch)
 
         print(
             f"Epoch {epoch:02d}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
         )
 
-    mlflow.log_metric("val_best_f1", val_best_f1)
-    mlflow.log_metric("val_best_epoch", val_best_epoch)
-    mlflow.log_metric("val_best_recall", val_best_recall)
-    mlflow.log_metric("val_best_sensitivity", val_best_sensitivity)
-    mlflow.log_metric("val_best_specificity", val_best_specificity)
-    mlflow.log_metric("val_best_accuracy", val_best_accuracy)
-    mlflow.log_metric("val_best_precision", val_best_precision)
-    mlflow.log_metric("val_best_recall", val_best_recall)
+    mlflow.log_metrics(add_prefix_to_metrics(val_best_metrics, "val_best"))
 
     print(f"=> Val best metrics (epoch: {val_best_epoch}):")
     print(val_best_report)

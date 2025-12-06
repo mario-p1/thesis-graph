@@ -43,9 +43,7 @@ def build_graph(
     mentors = sorted(thesis_df["mentor"].unique().tolist())
     mentors_dict = {mentor: index for index, mentor in enumerate(mentors)}
 
-    researchers_features = build_mentors_features_matrix(
-        researchers_df.to_dict(orient="records"), mentors_dict
-    )
+    researchers_features = build_mentors_features_matrix(researchers_df, mentors_dict)
     researchers_features = torch.from_numpy(researchers_features)
 
     # Build thesis features

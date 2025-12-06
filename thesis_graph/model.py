@@ -32,7 +32,7 @@ class Model(torch.nn.Module):
             data["thesis"].num_nodes, node_embedding_channels
         )
 
-        self.mentor_lin = torch.nn.Linear(384, node_embedding_channels)
+        self.mentor_lin = torch.nn.Linear(117, node_embedding_channels)
 
         self.mentor_emb = torch.nn.Embedding(
             data["mentor"].num_nodes, node_embedding_channels
@@ -51,15 +51,15 @@ class Model(torch.nn.Module):
         thesis_node_repr = self.thesis_lin(data["thesis"].x) + self.thesis_emb(
             data["thesis"].node_id
         )
-        mlflow.log_param("using_thesis_node_features", True)
+        mlflow.log_param("using_thesis_node_features", "abstract_embeding")
 
-        # mentor_node_repr = self.mentor_lin(data["mentor"].x) + self.mentor_emb(
-        #     data["mentor"].node_id
-        # )
-        # mlflow.log_param("using_mentor_node_features", True)
+        mentor_node_repr = self.mentor_lin(data["mentor"].x) + self.mentor_emb(
+            data["mentor"].node_id
+        )
+        mlflow.log_param("using_mentor_node_features", "interests(one-hot)")
 
-        mentor_node_repr = self.mentor_emb(data["mentor"].node_id)
-        mlflow.log_param("using_mentor_node_features", False)
+        # mentor_node_repr = self.mentor_emb(data["mentor"].node_id)
+        # mlflow.log_param("using_mentor_node_features", "none")
 
         x_dict = {
             "thesis": thesis_node_repr,
