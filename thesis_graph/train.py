@@ -232,8 +232,9 @@ def main():
 
     # _, test_scores, test_preds, test_labels = validate(model, test_loader, device)
     # print("=> Test metrics:")
+    # test_metrics = get_metrics(test_labels, test_scores, test_preds)
     # print(classification_report(test_labels, test_preds))
-    # print(get_metrics(test_labels, test_scores, test_preds))
+    # print(pd.DataFrame({"test": test_metrics}))
 
 
 if __name__ == "__main__":
