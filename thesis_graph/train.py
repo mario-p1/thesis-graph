@@ -89,7 +89,7 @@ def main():
     disjoint_train_ratio = 0.7
     neg_sampling_train_ratio = 1
     neg_sampling_val_test_ratio = 1.0
-    num_epochs = 50
+    num_epochs = 25
     node_embedding_channels = 64
     hidden_channels = 32
     learning_rate = 0.0001
