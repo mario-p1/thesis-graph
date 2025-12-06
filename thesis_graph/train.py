@@ -5,13 +5,7 @@ import torch
 import torch.nn.functional as F
 import torch_geometric.transforms as T
 import tqdm
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,
-    f1_score,
-    precision_score,
-    recall_score,
-)
+from sklearn.metrics import classification_report
 from torch_geometric import seed_everything
 from torch_geometric.loader import LinkNeighborLoader
 
@@ -101,11 +95,8 @@ def main():
     pd.options.display.max_rows = 20
     pd.options.display.max_columns = 20
 
-    df = load_thesis_csv(base_data_path / "committee.csv")
-    # df = df.head(20)
-
-    researchers_df = load_researchers_csv(base_data_path / "researchers.csv")
-
+    # df = load_thesis_csv(base_data_path / "committee.csv")
+    # researchers_df = load_researchers_csv(base_data_path / "researchers.csv")
     # data, metadata = build_graph(df, researchers_df)
     # pickle.dump((data, metadata), open("graph_data.pkl", "wb"))
 
@@ -162,6 +153,18 @@ def main():
             val_data["thesis", "supervised_by", "mentor"].edge_label_index,
         ),
         edge_label=val_data["thesis", "supervised_by", "mentor"].edge_label,
+        shuffle=False,
+    )
+
+    test_loader = LinkNeighborLoader(
+        data=test_data,
+        num_neighbors=[20, 10],
+        batch_size=64,
+        edge_label_index=(
+            ("thesis", "supervised_by", "mentor"),
+            test_data["thesis", "supervised_by", "mentor"].edge_label_index,
+        ),
+        edge_label=test_data["thesis", "supervised_by", "mentor"].edge_label,
         shuffle=False,
     )
 
@@ -226,6 +229,11 @@ def main():
     _, final_scores, final_preds, final_labels = validate(model, val_loader, device)
     print("=> Latest epoch metrics:")
     print(classification_report(final_labels, final_preds))
+
+    # _, test_scores, test_preds, test_labels = validate(model, test_loader, device)
+    # print("=> Test metrics:")
+    # print(classification_report(test_labels, test_preds))
+    # print(get_metrics(test_labels, test_scores, test_preds))
 
 
 if __name__ == "__main__":
