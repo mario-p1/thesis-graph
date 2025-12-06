@@ -1,4 +1,5 @@
 from sklearn.metrics import (
+    average_precision_score,
     f1_score,
     precision_score,
     recall_score,
@@ -14,6 +15,7 @@ def get_metrics(y_true, y_scores, y_preds) -> dict[str, float]:
     recall = recall_score(y_true, y_preds)
     specificity = recall_score(y_true, y_preds, pos_label=0)
     roc_auc = roc_auc_score(y_true, y_scores)
+    pr_auc = average_precision_score(y_true, y_scores)
 
     return {
         "f1": f1,
@@ -23,6 +25,7 @@ def get_metrics(y_true, y_scores, y_preds) -> dict[str, float]:
         "specificity": specificity,
         "sensitivity": recall,
         "roc_auc": roc_auc,
+        "pr_auc": pr_auc,
     }
 
 
