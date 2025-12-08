@@ -20,9 +20,11 @@ def train_epoch(
     loader: LinkNeighborLoader,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
+    pos_weight: float,
 ):
     model.train()
     total_loss = total_examples = 0
+    pos_weight_tensor = torch.tensor(pos_weight, device=device)
     for sampled_data in tqdm.tqdm(loader):
         optimizer.zero_grad()
 
@@ -30,7 +32,7 @@ def train_epoch(
         y = sampled_data["thesis", "supervised_by", "mentor"].edge_label
 
         pred = model(sampled_data)
-        loss = F.binary_cross_entropy_with_logits(pred, y)
+        loss = F.binary_cross_entropy_with_logits(pred, y, pos_weight=pos_weight_tensor)
 
         # breakpoint()
 
@@ -81,12 +83,13 @@ def validate(
 def main():
     # Hyperparameters
     disjoint_train_ratio = 0.7
-    neg_sampling_train_ratio = 1
-    neg_sampling_val_test_ratio = 1.0
-    num_epochs = 25
+    neg_sampling_train_ratio = 5
+    pos_weight = neg_sampling_train_ratio
+    neg_sampling_val_test_ratio = 56
+    num_epochs = 100
     node_embedding_channels = 64
     hidden_channels = 32
-    learning_rate = 0.0001
+    learning_rate = 0.001
     gnn_num_layers = 5
 
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
@@ -108,6 +111,7 @@ def main():
 
     mlflow.log_param("disjoint_train_ratio", disjoint_train_ratio)
     mlflow.log_param("neg_sampling_train_ratio", neg_sampling_train_ratio)
+    mlflow.log_param("pos_weight", pos_weight)
     mlflow.log_param("neg_sampling_val_test_ratio", neg_sampling_val_test_ratio)
     mlflow.log_param("num_epochs", num_epochs)
     mlflow.log_param("node_embedding_channels", node_embedding_channels)
@@ -189,7 +193,13 @@ def main():
 
     for epoch in range(0, num_epochs + 1):
         if epoch > 0:
-            train_epoch(model, train_loader, optimizer, device)
+            train_epoch(
+                model=model,
+                loader=train_loader,
+                optimizer=optimizer,
+                device=device,
+                pos_weight=pos_weight,
+            )
 
         val_loss, val_scores, val_preds, val_labels = validate(
             model, val_loader, device
@@ -201,7 +211,7 @@ def main():
         val_metrics = get_metrics(val_labels, val_scores, val_preds)
         train_metrics = get_metrics(train_labels, train_scores, train_preds)
 
-        if val_metrics["roc_auc"] > val_best_metrics.get("roc_auc", 0):
+        if val_metrics["pr_auc"] > val_best_metrics.get("pr_auc", 0):
             val_best_epoch = epoch
             val_best_metrics = val_metrics
 
