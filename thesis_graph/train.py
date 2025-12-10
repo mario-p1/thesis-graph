@@ -85,37 +85,36 @@ def get_ranking_scores(
     data: torch_geometric.data.HeteroData,
     model: Model,
     device: torch.device,
-    epoch: int,
 ) -> torch.Tensor:
     model.eval()
 
-    metrics = {}
+    ranks_sum = 0
+    reciprocal_ranks_sum = 0.0
+    n = 0
 
     with torch.no_grad():
         for real_mentor, thesis_features in zip(
             data[("thesis", "supervised_by", "mentor")].edge_label_index[1],
             data["thesis"].x,
         ):
+            real_mentor = real_mentor.to("cpu").item()
+
             thesis_features = thesis_features.to(device)
             scores = model.get_prediction_new_thesis(thesis_features)
+
             rankings = scores.argsort(descending=True).to("cpu").numpy().tolist()
 
-            rank_of_real_mentor = rankings.index(real_mentor.item()) + 1
+            rank_of_real_mentor = rankings.index(real_mentor) + 1
             reciprocal_rank = 1.0 / rank_of_real_mentor
 
-            metrics["rankings"] = metrics.get("rankings", []) + [rank_of_real_mentor]
-            metrics["reciprocal_ranks"] = metrics.get("reciprocal_ranks", []) + [
-                reciprocal_rank
-            ]
+            ranks_sum += rank_of_real_mentor
+            reciprocal_ranks_sum += reciprocal_rank
+            n += 1
 
-    # Average
-    mean_rank = sum(metrics["rankings"]) / len(metrics["rankings"])
-    mean_reciprocal_rank = sum(metrics["reciprocal_ranks"]) / len(
-        metrics["reciprocal_ranks"]
-    )
-
-    mlflow.log_metric("mean_rank", mean_rank, step=epoch)
-    mlflow.log_metric("mean_reciprocal_rank", mean_reciprocal_rank, step=epoch)
+    return {
+        "mean_rank": ranks_sum / n,
+        "mean_reciprocal_rank": reciprocal_ranks_sum / n,
+    }
 
 
 def main():
@@ -251,7 +250,8 @@ def main():
         val_metrics = get_metrics(val_labels, val_scores, val_preds)
         train_metrics = get_metrics(train_labels, train_scores, train_preds)
 
-        get_ranking_scores(val_data, model, device, epoch=epoch)
+        train_ranking_scores = get_ranking_scores(train_data, model, device)
+        val_ranking_scores = get_ranking_scores(val_data, model, device)
 
         if val_metrics["pr_auc"] > val_best_metrics.get("pr_auc", 0):
             val_best_epoch = epoch
@@ -262,12 +262,18 @@ def main():
                 val_preds,
             )
 
+        mlflow.log_metric("train_loss", train_loss, step=epoch)
         mlflow.log_metrics(add_prefix_to_metrics(train_metrics, "train"), step=epoch)
+        mlflow.log_metrics(
+            add_prefix_to_metrics(train_ranking_scores, "train_ranking"), step=epoch
+        )
 
         mlflow.log_metric("val_loss", val_loss, step=epoch)
         mlflow.log_metrics(add_prefix_to_metrics(val_metrics, "val"), step=epoch)
+        mlflow.log_metrics(
+            add_prefix_to_metrics(val_ranking_scores, "val_ranking"), step=epoch
+        )
 
-        mlflow.log_metric("train_loss", train_loss, step=epoch)
         print(
             f"Epoch {epoch:02d}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
         )
