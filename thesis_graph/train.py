@@ -97,6 +97,7 @@ def get_ranking_scores(
             data[("thesis", "supervised_by", "mentor")].edge_label_index[1],
             data["thesis"].x,
         ):
+            # TODO: Check if the data is sampled correctly
             real_mentor = real_mentor.to("cpu").item()
 
             thesis_features = thesis_features.to(device)
