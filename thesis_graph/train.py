@@ -122,12 +122,12 @@ def main():
     disjoint_train_ratio = 0.7
     neg_sampling_train_ratio = 5
     pos_weight = neg_sampling_train_ratio
-    neg_sampling_val_test_ratio = 56
+    neg_sampling_val_test_ratio = 10
     num_epochs = 100
-    node_embedding_channels = 64
+    node_embedding_channels = 256
     hidden_channels = 32
     learning_rate = 0.001
-    gnn_num_layers = 5
+    gnn_num_layers = 3
 
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
 
