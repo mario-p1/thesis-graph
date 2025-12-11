@@ -265,14 +265,12 @@ def main():
         mlflow.log_metric("train_loss", train_loss, step=epoch)
         mlflow.log_metrics(add_prefix_to_metrics(train_metrics, "train"), step=epoch)
         mlflow.log_metrics(
-            add_prefix_to_metrics(train_ranking_scores, "train_ranking"), step=epoch
+            add_prefix_to_metrics(train_ranking_scores, "train"), step=epoch
         )
 
         mlflow.log_metric("val_loss", val_loss, step=epoch)
         mlflow.log_metrics(add_prefix_to_metrics(val_metrics, "val"), step=epoch)
-        mlflow.log_metrics(
-            add_prefix_to_metrics(val_ranking_scores, "val_ranking"), step=epoch
-        )
+        mlflow.log_metrics(add_prefix_to_metrics(val_ranking_scores, "val"), step=epoch)
 
         print(
             f"Epoch {epoch:02d}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
