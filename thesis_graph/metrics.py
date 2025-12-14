@@ -54,6 +54,7 @@ def get_ranking_metrics(
     n = 0
 
     average_mentor_rank = defaultdict(lambda: 0)
+    ranked_first_count = defaultdict(lambda: 0)
 
     with torch.no_grad():
         for thesis_id, real_mentor in zip(
@@ -66,6 +67,8 @@ def get_ranking_metrics(
             scores = model.get_prediction_new_thesis(thesis_features)
 
             rankings = scores.argsort(descending=True).to("cpu").numpy().tolist()
+
+            ranked_first_count[rankings[0]] += 1
 
             for rank, mentor_id in enumerate(rankings):
                 average_mentor_rank[mentor_id] += rank + 1
@@ -86,5 +89,9 @@ def get_ranking_metrics(
         **{
             f"average_mentor_rank_{mentors_dict[mentor_id]}": avg_rank
             for mentor_id, avg_rank in average_mentor_rank.items()
+        },
+        **{
+            f"ranked_first_count_{mentors_dict[mentor_id]}": count
+            for mentor_id, count in ranked_first_count.items()
         },
     }
