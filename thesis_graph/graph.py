@@ -80,7 +80,7 @@ def build_graphs(
     thesis_path: Path = THESIS_CSV_PATH,
     train_ratio: float = 0.8,
     val_ratio: float = 0.1,
-    disjoint_train_ratio: float = 0.7,
+    disjoint_train_ratio: float = 0.5,
 ):
     thesis_df = load_thesis_csv(thesis_path)
 

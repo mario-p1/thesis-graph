@@ -81,7 +81,7 @@ def validate(
 
 def main():
     # Hyperparameters
-    disjoint_train_ratio = 0.7
+    disjoint_train_ratio = 0.3
     neg_sampling_train_ratio = 5
     pos_weight = neg_sampling_train_ratio
     neg_sampling_val_test_ratio = 10
@@ -108,7 +108,7 @@ def main():
     mlflow.log_param("gnn_num_layers", gnn_num_layers)
 
     # Build and save graph data
-    graphs_data = build_graphs()
+    graphs_data = build_graphs(disjoint_train_ratio=disjoint_train_ratio)
     pickle.dump(graphs_data, open("graph_data.pkl", "wb"))
 
     # Load saved graph data from disk
