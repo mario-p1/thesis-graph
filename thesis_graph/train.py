@@ -4,21 +4,13 @@ import mlflow
 import pandas as pd
 import torch
 import torch.nn.functional as F
-import torch_geometric.transforms as T
 import tqdm
 from sklearn.metrics import classification_report
 from torch_geometric import seed_everything
 from torch_geometric.loader import LinkNeighborLoader
 
-from thesis_graph.data import (
-    build_mentors_dict,
-    load_researchers_csv,
-    load_thesis_csv,
-)
-from thesis_graph.graph import build_graphs, build_single_graph
 from thesis_graph.metrics import add_prefix_to_metrics, get_metrics, get_ranking_metrics
 from thesis_graph.model import Model
-from thesis_graph.config import BASE_DATA_PATH
 
 
 def train_epoch(
