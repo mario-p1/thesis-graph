@@ -9,6 +9,7 @@ from sklearn.metrics import classification_report
 from torch_geometric import seed_everything
 from torch_geometric.loader import LinkNeighborLoader
 
+from thesis_graph.graph import build_graphs
 from thesis_graph.metrics import add_prefix_to_metrics, get_metrics, get_ranking_metrics
 from thesis_graph.model import Model
 
@@ -107,8 +108,8 @@ def main():
     mlflow.log_param("gnn_num_layers", gnn_num_layers)
 
     # Build and save graph data
-    # graphs_data = build_graphs(base_data_path / "committee.csv")
-    # pickle.dump(graphs_data, open("graph_data.pkl", "wb"))
+    graphs_data = build_graphs()
+    pickle.dump(graphs_data, open("graph_data.pkl", "wb"))
 
     # Load saved graph data from disk
     graphs_data = pickle.load(open("graph_data.pkl", "rb"))
@@ -117,8 +118,8 @@ def main():
 
     train_loader = LinkNeighborLoader(
         data=train_data,
-        num_neighbors=[20, 10],
-        batch_size=256,
+        num_neighbors=[-1],
+        batch_size=4096,
         edge_label_index=(
             ("thesis", "supervised_by", "mentor"),
             train_data["thesis", "supervised_by", "mentor"].edge_label_index,
@@ -130,26 +131,26 @@ def main():
 
     val_loader = LinkNeighborLoader(
         data=val_data,
-        num_neighbors=[20, 10],
-        batch_size=64,
-        # edge_label_index=(
-        #     ("thesis", "supervised_by", "mentor"),
-        #     val_data["thesis", "supervised_by", "mentor"].edge_label_index,
-        # ),
-        # edge_label=val_data["thesis", "supervised_by", "mentor"].edge_label,
+        num_neighbors=[-1],
+        batch_size=4096,
+        edge_label_index=(
+            ("thesis", "supervised_by", "mentor"),
+            val_data["thesis", "supervised_by", "mentor"].edge_label_index,
+        ),
+        edge_label=val_data["thesis", "supervised_by", "mentor"].edge_label,
         shuffle=False,
         neg_sampling_ratio=neg_sampling_val_test_ratio,
     )
 
     test_loader = LinkNeighborLoader(
         data=test_data,
-        num_neighbors=[20, 10],
-        batch_size=64,
-        # edge_label_index=(
-        #     ("thesis", "supervised_by", "mentor"),
-        #     test_data["thesis", "supervised_by", "mentor"].edge_label_index,
-        # ),
-        # edge_label=test_data["thesis", "supervised_by", "mentor"].edge_label,
+        num_neighbors=[-1],
+        batch_size=4096,
+        edge_label_index=(
+            ("thesis", "supervised_by", "mentor"),
+            test_data["thesis", "supervised_by", "mentor"].edge_label_index,
+        ),
+        edge_label=test_data["thesis", "supervised_by", "mentor"].edge_label,
         shuffle=False,
         neg_sampling_ratio=neg_sampling_val_test_ratio,
     )
