@@ -112,6 +112,8 @@ def add_negatives_to_edge_labels(
 
 def build_graphs(
     disjoint_train_ratio: float,
+    neg_train_ratio: int,
+    neg_val_test_ratio: int,
     thesis_path: Path = THESIS_CSV_PATH,
     train_ratio: float = 0.8,
     val_ratio: float = 0.1,
@@ -144,16 +146,21 @@ def build_graphs(
     add_negatives_to_edge_labels(
         train_data,
         ("thesis", "supervised_by", "mentor"),
-        1,
+        neg_train_ratio,
     )
 
     val_data = build_single_graph(
         val_df, mentors_dict=mentors_dict, add_edge_labels=True
     )
+    add_negatives_to_edge_labels(
+        val_data, ("thesis", "supervised_by", "mentor"), neg_val_test_ratio
+    )
 
-    add_negatives_to_edge_labels(val_data, ("thesis", "supervised_by", "mentor"), 1)
     test_data = build_single_graph(
         test_df, mentors_dict=mentors_dict, add_edge_labels=True
+    )
+    add_negatives_to_edge_labels(
+        test_data, ("thesis", "supervised_by", "mentor"), neg_val_test_ratio
     )
 
     return mentors_dict, train_data, val_data, test_data

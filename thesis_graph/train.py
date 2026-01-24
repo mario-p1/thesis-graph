@@ -87,14 +87,14 @@ def main():
 
     ## Training
     num_epochs = 100
-    learning_rate = 0.00005
+    learning_rate = 0.0003
 
     ## Model embedding
     node_embedding_channels = 128
 
     ## Model GNN
     hidden_channels = 64
-    gnn_num_layers = 1
+    gnn_num_layers = 2
 
     seed_everything(42)
     pd.options.display.max_rows = 20
@@ -115,8 +115,12 @@ def main():
     )
 
     # Build and save graph data
-    # graphs_data = build_graphs(disjoint_train_ratio=disjoint_train_ratio)
-    # pickle.dump(graphs_data, open("graph_data.pkl", "wb"))
+    graphs_data = build_graphs(
+        disjoint_train_ratio=disjoint_train_ratio,
+        neg_train_ratio=neg_sampling_train_ratio,
+        neg_val_test_ratio=neg_sampling_val_test_ratio,
+    )
+    pickle.dump(graphs_data, open("graph_data.pkl", "wb"))
 
     # Load saved graph data from disk
     graphs_data = pickle.load(open("graph_data.pkl", "rb"))
