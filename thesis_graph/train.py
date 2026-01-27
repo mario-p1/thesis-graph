@@ -1,5 +1,5 @@
 import pickle
-from random import random
+import random
 
 import pandas as pd
 import torch

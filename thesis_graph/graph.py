@@ -14,8 +14,7 @@ from thesis_graph.embedding import embed_text
 def build_single_graph(
     thesis_df: pd.DataFrame,
     mentors_dict: dict[str, int],
-    researchers_df: pd.DataFrame | None = None,
-    add_edge_labels: bool = False,
+    add_edge_labels: bool,
 ) -> HeteroData:
     # Build graph
     graph = HeteroData()
@@ -50,8 +49,6 @@ def build_single_graph(
     graph[
         "mentor", "supervises", "thesis"
     ].edge_index = thesis_supervised_by_mentor_indices.flip(0)
-
-    # TODO: Verify the flip 0 is correct
 
     # ==> Labels
     if add_edge_labels:
@@ -125,10 +122,9 @@ def build_graphs(
     )
     mentors_dict = build_mentors_dict(train_df)
 
-    # TODO: Remove after debugging
-    # train_df = train_df[:10]
-
-    orig_train_data = build_single_graph(train_df, mentors_dict=mentors_dict)
+    orig_train_data = build_single_graph(
+        train_df, mentors_dict=mentors_dict, add_edge_labels=False
+    )
 
     # Split train links into message passing and supervision links
     train_splitter = RandomLinkSplit(
