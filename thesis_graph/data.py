@@ -2,8 +2,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from thesis_graph import config
 
-def load_thesis_csv(path: Path) -> pd.DataFrame:
+
+def load_thesis_csv(path: Path = config.THESIS_CSV_PATH) -> pd.DataFrame:
     df = pd.read_csv(path)
     df.columns = [
         "thesis_title_mk",
@@ -20,6 +22,13 @@ def load_thesis_csv(path: Path) -> pd.DataFrame:
     df["application_date"] = pd.to_datetime(df["application_date"], format="%d.%m.%Y")
     df = df.sort_values(by="application_date", ascending=True)
     df = df.reset_index(drop=True)
+    return df
+
+
+def filter_thesis_df(df: pd.DataFrame) -> pd.DataFrame:
+    # TODO
+    # df = df[df["thesis_status"] == "Одбрана"].reset_index(drop=True)
+    df = df.drop_duplicates(subset=["student"], keep="last")
     return df
 
 

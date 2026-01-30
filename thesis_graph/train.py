@@ -8,6 +8,7 @@ import tqdm
 from sklearn.metrics import classification_report
 from torch.utils.tensorboard import SummaryWriter
 from torch_geometric import seed_everything
+from torch_geometric.data import HeteroData
 from torch_geometric.loader import LinkNeighborLoader
 
 from thesis_graph.graph import build_graphs
@@ -19,14 +20,20 @@ writer = SummaryWriter()
 
 def train_epoch(
     model: Model,
-    loader: LinkNeighborLoader,
+    loader: LinkNeighborLoader | None,
+    data: HeteroData | None,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
 ):
     model.train()
     total_loss = total_examples = 0
 
-    for sampled_data in tqdm.tqdm(loader):
+    if loader is not None:
+        data_iter = loader
+    else:
+        data_iter = [data]
+
+    for sampled_data in tqdm.tqdm(data_iter):
         optimizer.zero_grad()
 
         sampled_data = sampled_data.to(device)
@@ -44,7 +51,10 @@ def train_epoch(
 
 
 def validate(
-    model: Model, loader: LinkNeighborLoader, device: torch.device
+    model: Model,
+    loader: LinkNeighborLoader | None,
+    data: HeteroData | None,
+    device: torch.device,
 ) -> tuple[float, list, list, list]:
     # Return: loss, scores, preds, labels
     model.eval()
@@ -54,7 +64,11 @@ def validate(
 
     total_loss = total_examples = 0
     with torch.no_grad():
-        for sampled_data in loader:
+        if loader is not None:
+            data_iter = loader
+        else:
+            data_iter = [data]
+        for sampled_data in data_iter:
             sampled_data = sampled_data.to(device)
 
             pred = model.forward(sampled_data)
@@ -82,20 +96,20 @@ def validate(
 def main():
     # Hyperparameters
     ## Data
-    disjoint_train_ratio = 0.3
-    neg_sampling_train_ratio = 1
-    neg_sampling_val_test_ratio = 1
+    disjoint_train_ratio = 0.5
+    neg_sampling_train_ratio = 2
+    neg_sampling_val_test_ratio = 2
 
     ## Training
-    num_epochs = 100
+    num_epochs = 150
     learning_rate = 0.0003
 
     ## Model embedding
-    node_embedding_channels = 128
+    node_embedding_channels = 64
 
     ## Model GNN
-    hidden_channels = 64
-    gnn_num_layers = 2
+    hidden_channels = 32
+    gnn_num_layers = 1
 
     seed_everything(42)
     random.seed(42)
@@ -117,45 +131,17 @@ def main():
     )
 
     # Build and save graph data
-    graphs_data = build_graphs(
-        disjoint_train_ratio=disjoint_train_ratio,
-        neg_train_ratio=neg_sampling_train_ratio,
-        neg_val_test_ratio=neg_sampling_val_test_ratio,
-    )
-    pickle.dump(graphs_data, open("graph_data.pkl", "wb"))
+    # graphs_data = build_graphs(
+    #     disjoint_train_ratio=disjoint_train_ratio,
+    #     neg_train_ratio=neg_sampling_train_ratio,
+    #     neg_val_test_ratio=neg_sampling_val_test_ratio,
+    # )
+    # pickle.dump(graphs_data, open("graph_data.pkl", "wb"))
 
     # Load saved graph data from disk
     graphs_data = pickle.load(open("graph_data.pkl", "rb"))
 
     mentors_dict, train_data, val_data, _ = graphs_data
-
-    train_loader = LinkNeighborLoader(
-        data=train_data,
-        num_neighbors=[-1],
-        batch_size=len(
-            train_data["thesis", "supervised_by", "mentor"]["edge_index"][0]
-        ),
-        edge_label_index=(
-            ("thesis", "supervised_by", "mentor"),
-            train_data["thesis", "supervised_by", "mentor"].edge_label_index,
-        ),
-        edge_label=train_data["thesis", "supervised_by", "mentor"].edge_label,
-        shuffle=False,
-        neg_sampling_ratio=0,
-    )
-
-    val_loader = LinkNeighborLoader(
-        data=val_data,
-        num_neighbors=[-1],
-        batch_size=len(val_data["thesis", "supervised_by", "mentor"]["edge_index"][0]),
-        edge_label_index=(
-            ("thesis", "supervised_by", "mentor"),
-            val_data["thesis", "supervised_by", "mentor"].edge_label_index,
-        ),
-        edge_label=val_data["thesis", "supervised_by", "mentor"].edge_label,
-        shuffle=False,
-        neg_sampling_ratio=0,
-    )
 
     model = Model(
         num_mentors=train_data["mentor"].num_nodes,
@@ -182,19 +168,20 @@ def main():
         if epoch > 0:
             train_epoch(
                 model=model,
-                loader=train_loader,
+                loader=None,
+                data=train_data,
                 optimizer=optimizer,
                 device=device,
             )
 
         # Loss and predictions
         train_loss, train_scores, train_preds, train_labels = validate(
-            model, train_loader, device
+            model, None, train_data, device
         )
         writer.add_scalar("Loss/train", train_loss, epoch)
 
         val_loss, val_scores, val_preds, val_labels = validate(
-            model, val_loader, device
+            model, None, val_data, device
         )
         writer.add_scalar("Loss/val", val_loss, epoch)
 
@@ -229,7 +216,7 @@ def main():
     print(f"=> Val best metrics (epoch: {val_best_epoch}):")
     print(val_best_report)
 
-    _, _, last_epoch_preds, last_epoch_labels = validate(model, val_loader, device)
+    _, _, last_epoch_preds, last_epoch_labels = validate(model, None, val_data, device)
     print("=> Last epoch metrics:")
     print(classification_report(last_epoch_labels, last_epoch_preds))
 

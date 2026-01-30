@@ -7,7 +7,13 @@ from torch_geometric.typing import EdgeType, NodeType
 
 
 class Classifier(torch.nn.Module):
+    def __init__(self, thesis_dim: int, mentor_dim: int):
+        super().__init__()
+
+        self.lin = torch.nn.Linear(thesis_dim + mentor_dim, 1)
+
     def forward(self, x_thesis: Tensor, x_mentor: Tensor) -> Tensor:
+        return self.lin(torch.cat([x_thesis, x_mentor], dim=-1)).view(-1)
         return (x_thesis * x_mentor).sum(dim=-1)
 
 
@@ -35,7 +41,7 @@ class Model(torch.nn.Module):
         )
         self.gnn = to_hetero(self.gnn, metadata=metadata)
 
-        self.classifier = Classifier()
+        self.classifier = Classifier(hidden_channels, hidden_channels)
 
     def forward(self, data: HeteroData) -> Tensor:
         thesis_node_repr = self.thesis_lin(data["thesis"].x)
@@ -55,7 +61,7 @@ class Model(torch.nn.Module):
         x_dict = self.gnn(x_dict, data.edge_index_dict)
 
         eli = data["thesis", "supervised_by", "mentor"].edge_label_index
-
+        # breakpoint()
         pred = self.classifier(
             x_dict["thesis"][eli[0]],
             x_dict["mentor"][eli[1]],

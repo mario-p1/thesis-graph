@@ -7,7 +7,11 @@ from torch_geometric.data import HeteroData
 from torch_geometric.transforms import RandomLinkSplit
 
 from thesis_graph.config import THESIS_CSV_PATH
-from thesis_graph.data import load_thesis_csv, train_test_split_thesis_df
+from thesis_graph.data import (
+    filter_thesis_df,
+    load_thesis_csv,
+    train_test_split_thesis_df,
+)
 from thesis_graph.embedding import embed_text
 
 
@@ -116,6 +120,7 @@ def build_graphs(
     val_ratio: float = 0.1,
 ):
     thesis_df = load_thesis_csv(thesis_path)
+    thesis_df = filter_thesis_df(thesis_df)
 
     train_df, val_df, test_df = train_test_split_thesis_df(
         thesis_df, train_ratio=train_ratio, val_ratio=val_ratio
