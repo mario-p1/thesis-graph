@@ -1,5 +1,5 @@
-from pathlib import Path
 import random
+from pathlib import Path
 
 import pandas as pd
 import torch
@@ -8,75 +8,79 @@ from torch_geometric.transforms import RandomLinkSplit
 
 from thesis_graph.config import THESIS_CSV_PATH
 from thesis_graph.data import (
+    _build_professors_lookup,
     filter_thesis_df,
     load_thesis_csv,
-    train_test_split_thesis_df,
+    _map_professor_ids,
+    _train_test_split_df,
 )
 from thesis_graph.embedding import embed_text
 
 
 def build_single_graph(
     thesis_df: pd.DataFrame,
-    mentors_dict: dict[str, int],
-    add_edge_labels: bool,
+    professors_lookup: dict[str, int],
 ) -> HeteroData:
-    # Build graph
+    # Empty graph
     graph = HeteroData()
 
-    # => Thesis nodes
+    # Reset thesis_df index to ensure its index can be used as thesis node ids
+    thesis_df = thesis_df.reset_index(drop=True)
+
+    # Add Thesis nodes
+    torch_thesis_ids = torch.arange(thesis_df.shape[0])
     desc_embeddings = embed_text(thesis_df["thesis_desc_en"].tolist())
     thesis_features = torch.from_numpy(desc_embeddings)
 
-    graph["thesis"].node_id = torch.arange(len(thesis_df))
+    graph["thesis"].node_id = torch_thesis_ids
     graph["thesis"].x = thesis_features
 
-    # => Mentor nodes
-    graph["mentor"].node_id = torch.arange(len(mentors_dict))
+    # Add Professor nodes
+    graph["professor"].node_id = torch.arange(len(professors_lookup))
 
-    # => Thesis supervised by mentor links
-    thesis_indices = torch.arange(len(thesis_df))
-    mentor_indices = list(
-        thesis_df["mentor"].apply(lambda mentor: mentors_dict[mentor])
-    )
+    # Add Thesis supervised_by Professor edges
+    torch_mentor_ids = torch.LongTensor(thesis_df["mentor_id"].tolist())
 
-    thesis_supervised_by_mentor_indices = torch.vstack(
+    thesis_mentor_edges = torch.vstack(
         [
-            torch.LongTensor(thesis_indices),
-            torch.LongTensor(mentor_indices),
+            torch_thesis_ids,
+            torch_mentor_ids,
         ]
     )
 
-    # ==> Message passing
-    graph[
-        "thesis", "supervised_by", "mentor"
-    ].edge_index = thesis_supervised_by_mentor_indices
-    graph[
-        "mentor", "supervises", "thesis"
-    ].edge_index = thesis_supervised_by_mentor_indices.flip(0)
+    graph["thesis", "supervised_by", "professor"].edge_index = thesis_mentor_edges
+    graph["professor", "supervises", "thesis"].edge_index = thesis_mentor_edges.flip(0)
 
-    # ==> Labels
-    if add_edge_labels:
-        edge_labels = torch.ones(
-            thesis_supervised_by_mentor_indices.size(1), dtype=torch.float
-        )
-        graph["thesis", "supervised_by", "mentor"].edge_label = edge_labels
-        graph["mentor", "supervises", "thesis"].edge_label = edge_labels
-        graph["thesis", "supervised_by", "mentor"].edge_label_index = graph[
-            "thesis", "supervised_by", "mentor"
-        ].edge_index
-        graph["mentor", "supervises", "thesis"].edge_label_index = graph[
-            "mentor", "supervises", "thesis"
-        ].edge_index
+    # Add Thesis has_committee_member Professor edges
+    thesis_with_c1 = thesis_df.dropna(subset=["c1_id"])
+    thesis_with_c2 = thesis_df.dropna(subset=["c2_id"])
 
-    graph.validate(raise_on_error=False)
+    comission_edges = torch.hstack(
+        [
+            torch.vstack(
+                [
+                    torch.LongTensor(thesis_with_c1.index.tolist()),
+                    torch.LongTensor(thesis_with_c1["c1_id"].tolist()),
+                ]
+            ),
+            torch.vstack(
+                [
+                    torch.LongTensor(thesis_with_c2.index.tolist()),
+                    torch.LongTensor(thesis_with_c2["c2_id"].tolist()),
+                ]
+            ),
+        ]
+    )
+
+    graph["thesis", "has_committee_member", "professor"].edge_index = comission_edges
+    graph[
+        "professor", "is_committee_member_of", "thesis"
+    ].edge_index = comission_edges.flip(0)
+
+    # Validate graph
+    graph.validate()
 
     return graph
-
-
-def build_mentors_dict(thesis_df: pd.DataFrame) -> dict[str, int]:
-    mentors = sorted(thesis_df["mentor"].unique().tolist())
-    mentors_dict = {mentor: index for index, mentor in enumerate(mentors)}
-    return mentors_dict
 
 
 def add_negatives_to_edge_labels(
@@ -112,32 +116,24 @@ def add_negatives_to_edge_labels(
 
 
 def build_graphs(
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame | None,
+    test_df: pd.DataFrame | None,
+    professors_lookup: dict[str, int],
     disjoint_train_ratio: float,
     neg_train_ratio: int,
     neg_val_test_ratio: int,
-    thesis_path: Path = THESIS_CSV_PATH,
-    train_ratio: float = 0.8,
-    val_ratio: float = 0.1,
-):
-    thesis_df = load_thesis_csv(thesis_path)
-    thesis_df = filter_thesis_df(thesis_df)
-
-    train_df, val_df, test_df = train_test_split_thesis_df(
-        thesis_df, train_ratio=train_ratio, val_ratio=val_ratio
-    )
-    mentors_dict = build_mentors_dict(train_df)
-
-    orig_train_data = build_single_graph(
-        train_df, mentors_dict=mentors_dict, add_edge_labels=False
-    )
+) -> tuple[HeteroData, HeteroData | None, HeteroData | None]:
+    # Build train graph
+    orig_train_data = build_single_graph(train_df, professors_lookup=professors_lookup)
 
     # Split train links into message passing and supervision links
     train_splitter = RandomLinkSplit(
         num_test=0,
         num_val=0,
         disjoint_train_ratio=disjoint_train_ratio,
-        edge_types=[("thesis", "supervised_by", "mentor")],
-        rev_edge_types=[("mentor", "supervises", "thesis")],
+        edge_types=[("thesis", "has_committee_member", "professor")],
+        rev_edge_types=[("professor", "is_committee_member_of", "thesis")],
         neg_sampling_ratio=0,
     )
 
@@ -146,22 +142,24 @@ def build_graphs(
 
     add_negatives_to_edge_labels(
         train_data,
-        ("thesis", "supervised_by", "mentor"),
+        ("thesis", "has_committee_member", "professor"),
         neg_train_ratio,
     )
 
-    val_data = build_single_graph(
-        val_df, mentors_dict=mentors_dict, add_edge_labels=True
-    )
-    add_negatives_to_edge_labels(
-        val_data, ("thesis", "supervised_by", "mentor"), neg_val_test_ratio
-    )
+    val_data = None
+    # val_data = build_single_graph(
+    #     val_df, professors_lookup=professors_lookup, add_edge_labels=True
+    # )
+    # add_negatives_to_edge_labels(
+    #     val_data, ("thesis", "has_committee_member", "professor"), neg_val_test_ratio
+    # )
 
-    test_data = build_single_graph(
-        test_df, mentors_dict=mentors_dict, add_edge_labels=True
-    )
-    add_negatives_to_edge_labels(
-        test_data, ("thesis", "supervised_by", "mentor"), neg_val_test_ratio
-    )
+    test_data = None
+    # test_data = build_single_graph(
+    #     test_df, professors_lookup=professors_lookup, add_edge_labels=True
+    # )
+    # add_negatives_to_edge_labels(
+    #     test_data, ("thesis", "supervised_by", "mentor"), neg_val_test_ratio
+    # )
 
-    return mentors_dict, train_data, val_data, test_data
+    return train_data, val_data, test_data

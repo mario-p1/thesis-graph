@@ -11,6 +11,7 @@ from torch_geometric import seed_everything
 from torch_geometric.data import HeteroData
 from torch_geometric.loader import LinkNeighborLoader
 
+from thesis_graph.data import load_thesis_csv, prepare_thesis_data_splits
 from thesis_graph.graph import build_graphs
 from thesis_graph.metrics import calculate_metrics, log_metrics_tb
 from thesis_graph.model import Model
@@ -131,20 +132,29 @@ def main():
     )
 
     # Build and save graph data
-    # graphs_data = build_graphs(
-    #     disjoint_train_ratio=disjoint_train_ratio,
-    #     neg_train_ratio=neg_sampling_train_ratio,
-    #     neg_val_test_ratio=neg_sampling_val_test_ratio,
-    # )
-    # pickle.dump(graphs_data, open("graph_data.pkl", "wb"))
+    thesis_df = load_thesis_csv()
+    professors_lookup, train_df, val_df, test_df = prepare_thesis_data_splits(
+        thesis_df, train_ratio=0.8, val_ratio=0.1
+    )
+
+    graphs_data = build_graphs(
+        train_df=train_df,
+        val_df=val_df,
+        test_df=test_df,
+        professors_lookup=professors_lookup,
+        disjoint_train_ratio=disjoint_train_ratio,
+        neg_train_ratio=neg_sampling_train_ratio,
+        neg_val_test_ratio=neg_sampling_val_test_ratio,
+    )
+    pickle.dump(graphs_data, open("graph_data.pkl", "wb"))
 
     # Load saved graph data from disk
     graphs_data = pickle.load(open("graph_data.pkl", "rb"))
 
-    mentors_dict, train_data, val_data, _ = graphs_data
+    train_data, val_data, test_data = graphs_data
 
     model = Model(
-        num_mentors=train_data["mentor"].num_nodes,
+        num_mentors=train_data["professor"].num_nodes,
         thesis_features_dim=train_data["thesis"].x.shape[1],
         node_embedding_channels=node_embedding_channels,
         hidden_channels=hidden_channels,
@@ -154,71 +164,71 @@ def main():
     print("=> Model")
     print(model)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"=> Using device: {device}")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # print(f"=> Using device: {device}")
 
-    model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    # model = model.to(device)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    val_best_epoch = -1
-    val_best_metrics = {}
-    val_best_report = ""
+    # val_best_epoch = -1
+    # val_best_metrics = {}
+    # val_best_report = ""
 
-    for epoch in range(0, num_epochs + 1):
-        if epoch > 0:
-            train_epoch(
-                model=model,
-                loader=None,
-                data=train_data,
-                optimizer=optimizer,
-                device=device,
-            )
+    # for epoch in range(0, num_epochs + 1):
+    #     if epoch > 0:
+    #         train_epoch(
+    #             model=model,
+    #             loader=None,
+    #             data=train_data,
+    #             optimizer=optimizer,
+    #             device=device,
+    #         )
 
-        # Loss and predictions
-        train_loss, train_scores, train_preds, train_labels = validate(
-            model, None, train_data, device
-        )
-        writer.add_scalar("Loss/train", train_loss, epoch)
+    #     # Loss and predictions
+    #     train_loss, train_scores, train_preds, train_labels = validate(
+    #         model, None, train_data, device
+    #     )
+    #     writer.add_scalar("Loss/train", train_loss, epoch)
 
-        val_loss, val_scores, val_preds, val_labels = validate(
-            model, None, val_data, device
-        )
-        writer.add_scalar("Loss/val", val_loss, epoch)
+    #     val_loss, val_scores, val_preds, val_labels = validate(
+    #         model, None, val_data, device
+    #     )
+    #     writer.add_scalar("Loss/val", val_loss, epoch)
 
-        # Metrics
-        train_metrics = calculate_metrics(train_labels, train_scores, train_preds)
-        log_metrics_tb(writer, train_metrics, "train", epoch)
+    #     # Metrics
+    #     train_metrics = calculate_metrics(train_labels, train_scores, train_preds)
+    #     log_metrics_tb(writer, train_metrics, "train", epoch)
 
-        val_metrics = calculate_metrics(val_labels, val_scores, val_preds)
-        log_metrics_tb(writer, val_metrics, "val", epoch)
+    #     val_metrics = calculate_metrics(val_labels, val_scores, val_preds)
+    #     log_metrics_tb(writer, val_metrics, "val", epoch)
 
-        if epoch % 5 == 0:
-            writer.add_pr_curve("PR Curve/train", train_labels, train_scores, epoch)
-            writer.add_pr_curve("PR Curve/val", val_labels, val_scores, epoch)
-            writer.add_embedding(
-                model.mentor_emb.weight.cpu(),
-                metadata=mentors_dict,
-                global_step=epoch,
-                tag="Mentor Embeddings",
-            )
+    #     if epoch % 5 == 0:
+    #         writer.add_pr_curve("PR Curve/train", train_labels, train_scores, epoch)
+    #         writer.add_pr_curve("PR Curve/val", val_labels, val_scores, epoch)
+    #         writer.add_embedding(
+    #             model.professor_emb.weight.cpu(),
+    #             metadata=mentors_dict,
+    #             global_step=epoch,
+    #             tag="Mentor Embeddings",
+    #         )
 
-        if val_metrics["pr_auc"] > val_best_metrics.get("pr_auc", 0):
-            val_best_epoch = epoch
-            val_best_metrics = val_metrics
-            val_best_report = classification_report(val_labels, val_preds)
+    #     if val_metrics["pr_auc"] > val_best_metrics.get("pr_auc", 0):
+    #         val_best_epoch = epoch
+    #         val_best_metrics = val_metrics
+    #         val_best_report = classification_report(val_labels, val_preds)
 
-        print(
-            f"Epoch {epoch:02d}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
-        )
+    #     print(
+    #         f"Epoch {epoch:02d}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
+    #     )
 
-        writer.flush()
+    #     writer.flush()
 
-    print(f"=> Val best metrics (epoch: {val_best_epoch}):")
-    print(val_best_report)
+    # print(f"=> Val best metrics (epoch: {val_best_epoch}):")
+    # print(val_best_report)
 
-    _, _, last_epoch_preds, last_epoch_labels = validate(model, None, val_data, device)
-    print("=> Last epoch metrics:")
-    print(classification_report(last_epoch_labels, last_epoch_preds))
+    # _, _, last_epoch_preds, last_epoch_labels = validate(model, None, val_data, device)
+    # print("=> Last epoch metrics:")
+    # print(classification_report(last_epoch_labels, last_epoch_preds))
 
     writer.flush()
     writer.close()
