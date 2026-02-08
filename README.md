@@ -21,13 +21,8 @@ make install_deps_cu128
 All data files are placed inside the `data` directory.
 
 The following files are required in order to run the project:
-1. `committee.csv`
+1. `thesis.csv`
 2. `scholar_details.json`
-
-#### Train test split
-```bash
-uv run python -m thesis_graph.train_test_split
-```
 
 ### Train
 ```bash

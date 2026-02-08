@@ -1,6 +1,6 @@
 import pandas as pd
-from thesis_graph.config import BASE_DATA_PATH
-from thesis_graph.utils import load_json_file
+from committee_predictor.config import BASE_DATA_PATH
+from committee_predictor.utils import load_json_file
 
 
 def main():

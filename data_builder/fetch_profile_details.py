@@ -2,10 +2,10 @@ import serpapi
 import tqdm
 
 from data_builder.serpapi_client import get_serpapi_client
-from thesis_graph.config import BASE_DATA_PATH
-from thesis_graph.utils import get_current_time_str
-from thesis_graph.utils import save_json_to_file
-from thesis_graph.utils import load_json_file
+from committee_predictor.config import BASE_DATA_PATH
+from committee_predictor.utils import get_current_time_str
+from committee_predictor.utils import save_json_to_file
+from committee_predictor.utils import load_json_file
 
 
 def fetch_profile_details(client: serpapi.Client, author_id: str):

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 
-from thesis_graph.embedding import embed_text
+from committee_predictor.embedding import embed_text
 
 
 def get_researchers_features(

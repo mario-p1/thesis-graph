@@ -4,9 +4,9 @@ import serpapi
 import tqdm
 
 from data_builder.serpapi_client import get_serpapi_client
-from thesis_graph.config import BASE_DATA_PATH
-from thesis_graph.data import load_thesis_csv
-from thesis_graph.utils import (
+from committee_predictor.config import BASE_DATA_PATH
+from committee_predictor.data import load_thesis_csv
+from committee_predictor.utils import (
     convert_cyrillic_to_latin,
     get_current_time_str,
     save_json_to_file,
