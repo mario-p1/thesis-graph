@@ -2,6 +2,7 @@ from collections import defaultdict
 from sklearn.metrics import (
     average_precision_score,
     f1_score,
+    matthews_corrcoef,
     precision_score,
     recall_score,
     accuracy_score,
@@ -22,6 +23,7 @@ def calculate_metrics(y_true, y_pred_prob, y_pred_cat) -> dict[str, float]:
     specificity = recall_score(y_true, y_pred_cat, pos_label=0)
     roc_auc = roc_auc_score(y_true, y_pred_prob)
     pr_auc = average_precision_score(y_true, y_pred_prob)
+    mcc = matthews_corrcoef(y_true, y_pred_cat)
 
     return {
         "f1": f1,
@@ -32,6 +34,7 @@ def calculate_metrics(y_true, y_pred_prob, y_pred_cat) -> dict[str, float]:
         "sensitivity": recall,
         "roc_auc": roc_auc,
         "pr_auc": pr_auc,
+        "mcc": mcc,
     }
 
 
