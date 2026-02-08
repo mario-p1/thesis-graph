@@ -49,7 +49,7 @@ def prepare_thesis_data_splits(
 ) -> tuple[dict[str, int], pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     thesis_df = filter_thesis_df(thesis_df)
 
-    thesis_df = thesis_df[:100]  # TODO: Debugging
+    # thesis_df = thesis_df[:100]  # TODO: Debugging
 
     train_df, val_df, test_df = _train_test_split_df(
         thesis_df, train_ratio=train_ratio, val_ratio=val_ratio
