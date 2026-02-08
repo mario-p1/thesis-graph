@@ -24,11 +24,6 @@ The following files are required in order to run the project:
 1. `thesis.csv`
 2. `scholar_details.json`
 
-#### Train test split
-```bash
-uv run python -m thesis_graph.train_test_split
-```
-
 ### Train
 ```bash
 make train
