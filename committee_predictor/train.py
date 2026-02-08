@@ -38,11 +38,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learning-rate", type=float)
 
     # Model embedding
-    parser.add_argument("--node-embedding-channels", type=int)
+    parser.add_argument("--node-embedding-dim", type=int)
 
     # Model GNN
-    parser.add_argument("--hidden-channels", type=int)
+    parser.add_argument("--gnn-dim", type=int)
     parser.add_argument("--gnn-num-layers", type=int)
+
+    # Model classifier
+    parser.add_argument("--classifier-dim", type=int)
 
     return parser.parse_args()
 
@@ -57,7 +60,7 @@ def train_epoch(
 
     optimizer.zero_grad()
 
-    y = data["thesis", "has_committee_member", "professor"].edge_label
+    y = data["thesis", "has_committee_member", "professor"].edge_label.float()
 
     pred = model(data)
     loss = F.binary_cross_entropy_with_logits(pred, y)
@@ -115,10 +118,11 @@ def main():
     learning_rate = args.learning_rate
 
     # Model embedding
-    node_embedding_channels = args.node_embedding_channels
+    node_embedding_dim = args.node_embedding_dim
+    classifier_dim = args.classifier_dim
 
     # Model GNN
-    hidden_channels = args.hidden_channels
+    gnn_dim = args.gnn_dim
     gnn_num_layers = args.gnn_num_layers
 
     seed_everything(42)
@@ -132,11 +136,12 @@ def main():
             "neg_sampling_train_ratio": neg_sampling_train_ratio,
             "neg_sampling_val_test_ratio": neg_sampling_val_test_ratio,
             "num_epochs": num_epochs,
-            "node_embedding_channels": node_embedding_channels,
-            "hidden_channels": hidden_channels,
+            "node_embedding_dim": node_embedding_dim,
+            "gnn_dim": gnn_dim,
             "learning_rate": learning_rate,
             "gnn_num_layers": gnn_num_layers,
             "thesis_filter": thesis_filter,
+            "classifier_dim": classifier_dim,
         },
         {},
     )
@@ -169,9 +174,10 @@ def main():
     model = Model(
         num_mentors=train_data["professor"].num_nodes,
         thesis_features_dim=train_data["thesis"].x.shape[1],
-        node_embedding_channels=node_embedding_channels,
-        hidden_channels=hidden_channels,
+        node_embedding_dim=node_embedding_dim,
+        gnn_dim=gnn_dim,
         gnn_num_layers=gnn_num_layers,
+        classifier_dim=classifier_dim,
         metadata=train_data.metadata(),
     )
 

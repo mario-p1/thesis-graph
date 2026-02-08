@@ -7,10 +7,12 @@ from torch_geometric.typing import EdgeType, NodeType
 
 
 class Classifier(torch.nn.Module):
-    def __init__(self, thesis_dim: int, professor_dim: int):
+    def __init__(self, thesis_dim: int, professor_dim: int, hidden_dim: int):
         super().__init__()
-        self.lin = torch.nn.Linear(thesis_dim + professor_dim + professor_dim, 32)
-        self.lin2 = torch.nn.Linear(32, 1)
+        self.lin = torch.nn.Linear(
+            thesis_dim + professor_dim + professor_dim, hidden_dim
+        )
+        self.lin2 = torch.nn.Linear(hidden_dim, 1)
 
     def forward(
         self, x_thesis: Tensor, x_mentor: Tensor, x_committee_member: Tensor
@@ -27,30 +29,33 @@ class Model(torch.nn.Module):
         self,
         num_mentors: int,
         thesis_features_dim: int,
-        node_embedding_channels: int,
-        hidden_channels: int,
+        node_embedding_dim: int,
+        gnn_dim: int,
         gnn_num_layers: int,
+        classifier_dim: int,
         metadata: tuple[list[NodeType], list[EdgeType]],
     ):
         super().__init__()
 
         # Thesis features space -> node embedding space
-        self.thesis_lin = torch.nn.Linear(thesis_features_dim, node_embedding_channels)
+        self.thesis_lin = torch.nn.Linear(thesis_features_dim, node_embedding_dim)
 
         # Professor embeddings
-        self.professor_emb = torch.nn.Embedding(num_mentors, node_embedding_channels)
+        self.professor_emb = torch.nn.Embedding(num_mentors, node_embedding_dim)
 
         # Graph Neural Network
         self.gnn = GraphSAGE(
-            in_channels=node_embedding_channels,
-            hidden_channels=hidden_channels,
+            in_channels=node_embedding_dim,
+            hidden_channels=gnn_dim,
             num_layers=gnn_num_layers,
             aggr="sum",
         )
         self.gnn = to_hetero(self.gnn, metadata=metadata)
 
         # Classifier (mentor professor + thesis + professor) -> score
-        self.classifier = Classifier(hidden_channels, hidden_channels)
+        self.classifier = Classifier(
+            thesis_dim=gnn_dim, professor_dim=gnn_dim, hidden_dim=classifier_dim
+        )
 
     def forward(self, data: HeteroData) -> Tensor:
         thesis_node_repr = self.thesis_lin(data["thesis"].x)
