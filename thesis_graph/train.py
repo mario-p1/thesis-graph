@@ -1,3 +1,4 @@
+import argparse
 import pickle
 import random
 
@@ -17,6 +18,35 @@ from thesis_graph.metrics import calculate_metrics, log_metrics_tb
 from thesis_graph.model import Model
 
 writer = SummaryWriter()
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train the thesis graph model.")
+
+    # Data
+    parser.add_argument("--disjoint-train-ratio", type=float)
+    parser.add_argument("--neg-sampling-train-ratio", type=int)
+    parser.add_argument("--neg-sampling-val-test-ratio", type=int)
+    parser.add_argument(
+        "--thesis-filter",
+        type=int,
+        default=0,
+        help="Negative number to use only the latest N thesis, "
+        "positive number to use only the first N thesis, 0 to use all thesis",
+    )
+
+    # Training
+    parser.add_argument("--num-epochs", type=int)
+    parser.add_argument("--learning-rate", type=float)
+
+    # Model embedding
+    parser.add_argument("--node-embedding-channels", type=int)
+
+    # Model GNN
+    parser.add_argument("--hidden-channels", type=int)
+    parser.add_argument("--gnn-num-layers", type=int)
+
+    return parser.parse_args()
 
 
 def train_epoch(
@@ -97,22 +127,24 @@ def validate(
 
 
 def main():
-    # Hyperparameters
-    ## Data
-    disjoint_train_ratio = 0.5
-    neg_sampling_train_ratio = 2
-    neg_sampling_val_test_ratio = 2
+    args = parse_args()
 
-    ## Training
-    num_epochs = 150
-    learning_rate = 0.0003
+    # Data
+    disjoint_train_ratio = args.disjoint_train_ratio
+    neg_sampling_train_ratio = args.neg_sampling_train_ratio
+    neg_sampling_val_test_ratio = args.neg_sampling_val_test_ratio
+    thesis_filter = args.thesis_filter
 
-    ## Model embedding
-    node_embedding_channels = 64
+    # Training
+    num_epochs = args.num_epochs
+    learning_rate = args.learning_rate
 
-    ## Model GNN
-    hidden_channels = 32
-    gnn_num_layers = 1
+    # Model embedding
+    node_embedding_channels = args.node_embedding_channels
+
+    # Model GNN
+    hidden_channels = args.hidden_channels
+    gnn_num_layers = args.gnn_num_layers
 
     seed_everything(42)
     random.seed(42)
@@ -129,6 +161,7 @@ def main():
             "hidden_channels": hidden_channels,
             "learning_rate": learning_rate,
             "gnn_num_layers": gnn_num_layers,
+            "thesis_filter": thesis_filter,
         },
         {},
     )
@@ -136,7 +169,7 @@ def main():
     # Build and save graph data
     thesis_df = load_thesis_csv()
     professors_lookup, train_df, val_df, test_df = prepare_thesis_data_splits(
-        thesis_df, train_ratio=0.8, val_ratio=0.1
+        thesis_df, train_ratio=0.8, val_ratio=0.1, thesis_filter=thesis_filter
     )
 
     graphs_data = build_graphs(
@@ -148,12 +181,12 @@ def main():
         neg_train_ratio=neg_sampling_train_ratio,
         neg_val_test_ratio=neg_sampling_val_test_ratio,
     )
-    pickle.dump(graphs_data, open("graph_data.pkl", "wb"))
+    pickle.dump((professors_lookup, *graphs_data), open("graph_data.pkl", "wb"))
 
     # Load saved graph data from disk
     graphs_data = pickle.load(open("graph_data.pkl", "rb"))
 
-    train_data, val_data, test_data = graphs_data
+    professors_lookup, train_data, val_data, test_data = graphs_data
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"=> Using device: {device}")
@@ -185,26 +218,26 @@ def main():
             )
 
         # Loss and predictions
-        train_loss, train_scores, train_preds, train_labels = validate(
+        train_loss, train_pred_prob, train_pred_cat, train_labels = validate(
             model, None, train_data, device
         )
         writer.add_scalar("Loss/train", train_loss, epoch)
 
-        val_loss, val_scores, val_preds, val_labels = validate(
+        val_loss, val_pred_prob, val_pred_cat, val_labels = validate(
             model, None, val_data, device
         )
         writer.add_scalar("Loss/val", val_loss, epoch)
 
         # Metrics
-        train_metrics = calculate_metrics(train_labels, train_scores, train_preds)
+        train_metrics = calculate_metrics(train_labels, train_pred_prob, train_pred_cat)
         log_metrics_tb(writer, train_metrics, "train", epoch)
 
-        val_metrics = calculate_metrics(val_labels, val_scores, val_preds)
+        val_metrics = calculate_metrics(val_labels, val_pred_prob, val_pred_cat)
         log_metrics_tb(writer, val_metrics, "val", epoch)
 
         if epoch % 5 == 0:
-            writer.add_pr_curve("PR Curve/train", train_labels, train_scores, epoch)
-            writer.add_pr_curve("PR Curve/val", val_labels, val_scores, epoch)
+            writer.add_pr_curve("PR Curve/train", train_labels, train_pred_prob, epoch)
+            writer.add_pr_curve("PR Curve/val", val_labels, val_pred_prob, epoch)
             writer.add_embedding(
                 model.professor_emb.weight.cpu(),
                 metadata=professors_lookup,
@@ -218,9 +251,19 @@ def main():
 
         writer.flush()
 
-    # _, _, last_epoch_preds, last_epoch_labels = validate(model, None, val_data, device)
-    # print("=> Last epoch metrics:")
-    # print(classification_report(last_epoch_labels, last_epoch_preds))
+    _, _, last_epoch_pred_cat, last_epoch_labels = validate(
+        model, None, val_data, device
+    )
+    print("=> Last epoch metrics:")
+    print(classification_report(last_epoch_labels, last_epoch_pred_cat))
+
+    print("=> Final test metrics:")
+    _, test_pred_prob, test_pred_cat, test_labels = validate(
+        model, None, test_data, device
+    )
+    test_metrics = calculate_metrics(test_labels, test_pred_prob, test_pred_cat)
+    print(classification_report(test_labels, test_pred_cat))
+    print(test_metrics)
 
     writer.flush()
     writer.close()

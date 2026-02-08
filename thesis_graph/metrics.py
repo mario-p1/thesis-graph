@@ -14,14 +14,14 @@ from thesis_graph.model import Model
 from thesis_graph.utils import reverse_dict
 
 
-def calculate_metrics(y_true, y_scores, y_preds) -> dict[str, float]:
-    f1 = f1_score(y_true, y_preds, average="weighted")
-    accuracy = accuracy_score(y_true, y_preds)
-    precision = precision_score(y_true, y_preds)
-    recall = recall_score(y_true, y_preds)
-    specificity = recall_score(y_true, y_preds, pos_label=0)
-    roc_auc = roc_auc_score(y_true, y_scores)
-    pr_auc = average_precision_score(y_true, y_scores)
+def calculate_metrics(y_true, y_pred_prob, y_pred_cat) -> dict[str, float]:
+    f1 = f1_score(y_true, y_pred_cat)
+    accuracy = accuracy_score(y_true, y_pred_cat)
+    precision = precision_score(y_true, y_pred_cat)
+    recall = recall_score(y_true, y_pred_cat)
+    specificity = recall_score(y_true, y_pred_cat, pos_label=0)
+    roc_auc = roc_auc_score(y_true, y_pred_prob)
+    pr_auc = average_precision_score(y_true, y_pred_prob)
 
     return {
         "f1": f1,

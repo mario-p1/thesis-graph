@@ -46,10 +46,14 @@ def prepare_thesis_data_splits(
     thesis_df: pd.DataFrame,
     train_ratio: float,
     val_ratio: float,
+    thesis_filter: int = 0,
 ) -> tuple[dict[str, int], pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     thesis_df = filter_thesis_df(thesis_df)
 
-    # thesis_df = thesis_df[:100]  # TODO: Debugging
+    if thesis_filter < 0:
+        thesis_df = thesis_df[thesis_filter:]
+    elif thesis_filter > 0:
+        thesis_df = thesis_df[:thesis_filter]
 
     train_df, val_df, test_df = _train_test_split_df(
         thesis_df, train_ratio=train_ratio, val_ratio=val_ratio

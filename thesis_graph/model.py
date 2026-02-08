@@ -9,15 +9,17 @@ from torch_geometric.typing import EdgeType, NodeType
 class Classifier(torch.nn.Module):
     def __init__(self, thesis_dim: int, professor_dim: int):
         super().__init__()
-
-        self.lin = torch.nn.Linear(thesis_dim + professor_dim + professor_dim, 1)
+        self.lin = torch.nn.Linear(thesis_dim + professor_dim + professor_dim, 32)
+        self.lin2 = torch.nn.Linear(32, 1)
 
     def forward(
         self, x_thesis: Tensor, x_mentor: Tensor, x_committee_member: Tensor
     ) -> Tensor:
-        return self.lin(
-            torch.cat([x_thesis, x_mentor, x_committee_member], dim=-1)
-        ).view(-1)
+        x = self.lin(torch.cat([x_thesis, x_mentor, x_committee_member], dim=-1))
+        x = torch.relu(x)
+        x = self.lin2(x)
+        x = x.view(-1)
+        return x
 
 
 class Model(torch.nn.Module):

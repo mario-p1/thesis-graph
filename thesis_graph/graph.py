@@ -1,19 +1,10 @@
 import random
-from pathlib import Path
 
 import pandas as pd
 import torch
 from torch_geometric.data import HeteroData
 from torch_geometric.transforms import RandomLinkSplit
 
-from thesis_graph.config import THESIS_CSV_PATH
-from thesis_graph.data import (
-    _build_professors_lookup,
-    filter_thesis_df,
-    load_thesis_csv,
-    _map_professor_ids,
-    _train_test_split_df,
-)
 from thesis_graph.embedding import embed_text
 
 
@@ -157,7 +148,6 @@ def build_graphs(
         neg_train_ratio,
     )
 
-    val_data = None
     val_data = build_single_graph(
         val_df, professors_lookup=professors_lookup, add_edge_labels=True
     )
@@ -165,7 +155,6 @@ def build_graphs(
         val_data, ("thesis", "has_committee_member", "professor"), neg_val_test_ratio
     )
 
-    test_data = None
     test_data = build_single_graph(
         test_df, professors_lookup=professors_lookup, add_edge_labels=True
     )

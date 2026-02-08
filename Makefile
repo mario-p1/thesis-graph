@@ -1,6 +1,16 @@
 .PHONY:
 train:
-	uv run python -m thesis_graph.train
+	uv run python -m thesis_graph.train \
+		--disjoint-train-ratio 0.4 \
+		--neg-sampling-train-ratio 2 \
+		--neg-sampling-val-test-ratio 2 \
+		--thesis-filter -1000 \
+		--num-epochs 300 \
+		--learning-rate 0.0003 \
+		--node-embedding-channels 64 \
+		--hidden-channels 64 \
+		--gnn-num-layers 2
+
 
 .PHONY:
 tensorboard:
