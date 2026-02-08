@@ -80,16 +80,18 @@ def validate(
 
     with torch.no_grad():
         pred = model.forward(data)
-        labels = data["thesis", "has_committee_member", "professor"].edge_label
-
-        all_pred_probs.append(pred.cpu())
-        all_pred_cats.append((pred > 0).cpu().int())
-        all_labels.append(labels.cpu())
+        labels = data["thesis", "has_committee_member", "professor"].edge_label.float()
 
         loss = F.binary_cross_entropy_with_logits(
             pred,
             labels.float(),
         )
+
+        pred_probs = torch.sigmoid(pred)
+
+        all_pred_probs.append(pred_probs.cpu())
+        all_pred_cats.append((pred_probs > 0.5).cpu().int())
+        all_labels.append(labels.cpu())
 
     return (
         loss.item(),
