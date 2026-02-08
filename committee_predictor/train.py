@@ -5,12 +5,10 @@ import random
 import pandas as pd
 import torch
 import torch.nn.functional as F
-import tqdm
 from sklearn.metrics import classification_report
 from torch.utils.tensorboard import SummaryWriter
 from torch_geometric import seed_everything
 from torch_geometric.data import HeteroData
-from torch_geometric.loader import LinkNeighborLoader
 
 from committee_predictor.data import load_thesis_csv, prepare_thesis_data_splits
 from committee_predictor.graph import build_graphs
@@ -51,77 +49,52 @@ def parse_args() -> argparse.Namespace:
 
 def train_epoch(
     model: Model,
-    loader: LinkNeighborLoader | None,
-    data: HeteroData | None,
+    data: HeteroData,
     optimizer: torch.optim.Optimizer,
-    device: torch.device,
-):
+) -> float:
+    # Returns: training loss
     model.train()
-    total_loss = total_examples = 0
 
-    if loader is not None:
-        data_iter = loader
-    else:
-        data_iter = [data]
+    optimizer.zero_grad()
 
-    for sampled_data in tqdm.tqdm(data_iter):
-        optimizer.zero_grad()
+    y = data["thesis", "has_committee_member", "professor"].edge_label
 
-        sampled_data = sampled_data.to(device)
-        y = sampled_data["thesis", "has_committee_member", "professor"].edge_label
+    pred = model(data)
+    loss = F.binary_cross_entropy_with_logits(pred, y)
 
-        pred = model(sampled_data)
-        loss = F.binary_cross_entropy_with_logits(pred, y)
+    loss.backward()
+    optimizer.step()
 
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item() * pred.numel()
-        total_examples += pred.numel()
-
-    return total_loss / total_examples
+    return loss.item()
 
 
 def validate(
     model: Model,
-    loader: LinkNeighborLoader | None,
-    data: HeteroData | None,
-    device: torch.device,
+    data: HeteroData,
 ) -> tuple[float, list, list, list]:
-    # Return: loss, scores, preds, labels
+    # Returns: loss, pred probabilities, pred categories, ground truth labels
     model.eval()
-    all_scores = []
-    all_preds = []
+    all_pred_probs = []
+    all_pred_cats = []
     all_labels = []
 
-    total_loss = total_examples = 0
     with torch.no_grad():
-        if loader is not None:
-            data_iter = loader
-        else:
-            data_iter = [data]
-        for sampled_data in data_iter:
-            sampled_data = sampled_data.to(device)
+        pred = model.forward(data)
+        labels = data["thesis", "has_committee_member", "professor"].edge_label
 
-            pred = model.forward(sampled_data)
-            labels = sampled_data[
-                "thesis", "has_committee_member", "professor"
-            ].edge_label
+        all_pred_probs.append(pred.cpu())
+        all_pred_cats.append((pred > 0).cpu().int())
+        all_labels.append(labels.cpu())
 
-            all_scores.append(pred.cpu())
-            all_preds.append((pred > 0).cpu().int())
-            all_labels.append(labels.cpu())
-
-            loss = F.binary_cross_entropy_with_logits(
-                pred,
-                labels.float(),
-            )
-            total_loss += loss.item() * pred.numel()
-            total_examples += pred.numel()
+        loss = F.binary_cross_entropy_with_logits(
+            pred,
+            labels.float(),
+        )
 
     return (
-        total_loss / total_examples,
-        torch.cat(all_scores),
-        torch.cat(all_preds),
+        loss.item(),
+        torch.cat(all_pred_probs),
+        torch.cat(all_pred_cats),
         torch.cat(all_labels),
     )
 
@@ -199,11 +172,17 @@ def main():
         gnn_num_layers=gnn_num_layers,
         metadata=train_data.metadata(),
     )
-    model = model.to(device)
+
     print("=> Model")
     print(model)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Move data to target device
+    model = model.to(device)
+    train_data = train_data.to(device)
+    val_data = val_data.to(device)
+    test_data = test_data.to(device)
 
     # TODO: Implement torch checkpointer
 
@@ -211,33 +190,33 @@ def main():
         if epoch > 0:
             train_epoch(
                 model=model,
-                loader=None,
                 data=train_data,
                 optimizer=optimizer,
-                device=device,
             )
 
         # Loss and predictions
-        train_loss, train_pred_prob, train_pred_cat, train_labels = validate(
-            model, None, train_data, device
+        train_loss, train_pred_probs, train_pred_cats, train_labels = validate(
+            model=model, data=train_data
         )
         writer.add_scalar("Loss/train", train_loss, epoch)
 
-        val_loss, val_pred_prob, val_pred_cat, val_labels = validate(
-            model, None, val_data, device
+        val_loss, val_pred_probs, val_pred_cats, val_labels = validate(
+            model=model, data=val_data
         )
         writer.add_scalar("Loss/val", val_loss, epoch)
 
         # Metrics
-        train_metrics = calculate_metrics(train_labels, train_pred_prob, train_pred_cat)
+        train_metrics = calculate_metrics(
+            train_labels, train_pred_probs, train_pred_cats
+        )
         log_metrics_tb(writer, train_metrics, "train", epoch)
 
-        val_metrics = calculate_metrics(val_labels, val_pred_prob, val_pred_cat)
+        val_metrics = calculate_metrics(val_labels, val_pred_probs, val_pred_cats)
         log_metrics_tb(writer, val_metrics, "val", epoch)
 
         if epoch % 5 == 0:
-            writer.add_pr_curve("PR Curve/train", train_labels, train_pred_prob, epoch)
-            writer.add_pr_curve("PR Curve/val", val_labels, val_pred_prob, epoch)
+            writer.add_pr_curve("PR Curve/train", train_labels, train_pred_probs, epoch)
+            writer.add_pr_curve("PR Curve/val", val_labels, val_pred_probs, epoch)
             writer.add_embedding(
                 model.professor_emb.weight.cpu(),
                 metadata=professors_lookup,
@@ -251,18 +230,16 @@ def main():
 
         writer.flush()
 
-    _, _, last_epoch_pred_cat, last_epoch_labels = validate(
-        model, None, val_data, device
-    )
+    _, _, last_epoch_pred_cats, last_epoch_labels = validate(model=model, data=val_data)
     print("=> Last epoch metrics:")
-    print(classification_report(last_epoch_labels, last_epoch_pred_cat))
+    print(classification_report(last_epoch_labels, last_epoch_pred_cats))
 
     print("=> Final test metrics:")
-    _, test_pred_prob, test_pred_cat, test_labels = validate(
-        model, None, test_data, device
+    _, test_pred_probs, test_pred_cats, test_labels = validate(
+        model=model, data=test_data
     )
-    test_metrics = calculate_metrics(test_labels, test_pred_prob, test_pred_cat)
-    print(classification_report(test_labels, test_pred_cat))
+    test_metrics = calculate_metrics(test_labels, test_pred_probs, test_pred_cats)
+    print(classification_report(test_labels, test_pred_cats))
     print(test_metrics)
 
     writer.flush()
