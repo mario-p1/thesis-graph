@@ -35,6 +35,8 @@ def parse_args() -> argparse.Namespace:
         help="Negative number to use only the latest N thesis, "
         "positive number to use only the first N thesis, 0 to use all thesis",
     )
+    parser.add_argument("--train-ratio", type=float, required=True)
+    parser.add_argument("--val-ratio", type=float, required=True)
 
     # Training
     parser.add_argument("--num-epochs", type=int, required=True)
@@ -126,6 +128,8 @@ def main():
     neg_sampling_train_ratio = args.neg_sampling_train_ratio
     neg_sampling_val_test_ratio = args.neg_sampling_val_test_ratio
     thesis_filter = args.thesis_filter
+    train_ratio = args.train_ratio
+    val_ratio = args.val_ratio
 
     # Training
     num_epochs = args.num_epochs
@@ -150,7 +154,10 @@ def main():
     # Build and save graph data
     thesis_df = load_thesis_csv()
     professors_lookup, train_df, val_df, test_df = prepare_thesis_data_splits(
-        thesis_df, train_ratio=0.8, val_ratio=0.1, thesis_filter=thesis_filter
+        thesis_df,
+        train_ratio=train_ratio,
+        val_ratio=val_ratio,
+        thesis_filter=thesis_filter,
     )
 
     graphs_data = build_graphs(

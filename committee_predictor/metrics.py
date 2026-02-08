@@ -35,6 +35,8 @@ def calculate_metrics(y_true, y_pred_prob, y_pred_cat) -> dict[str, float]:
         "roc_auc": roc_auc,
         "pr_auc": pr_auc,
         "mcc": mcc,
+        "support_pos": y_true.sum().item(),
+        "support_neg": (y_true == 0).sum().item(),
     }
 
 

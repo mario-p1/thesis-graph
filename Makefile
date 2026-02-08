@@ -11,7 +11,9 @@ train:
 		--gnn-dim 64 \
 		--gnn-num-layers 2 \
 		--classifier-dim 32 \
-		--threshold 0.5
+		--threshold 0.31 \
+		--train-ratio 0.8 \
+		--val-ratio 0.1
 
 .PHONY:
 train_best:
@@ -26,7 +28,9 @@ train_best:
 		--gnn-dim 64 \
 		--gnn-num-layers 2 \
 		--classifier-dim 32 \
-		--threshold 0.31
+		--threshold 0.31 \
+		--train-ratio 0.8 \
+		--val-ratio 0.1
 
 .PHONY:
 tensorboard:
